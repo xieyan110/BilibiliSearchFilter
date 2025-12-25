@@ -34,7 +34,7 @@
         position: fixed;
         bottom: 80px;
         right: 20px;
-        width: 320px;
+        width: 380px;
         background: white;
         border-radius: 8px;
         box-shadow: 0 4px 20px rgba(0,0,0,0.3);
@@ -83,12 +83,12 @@
             <label style="display: block; margin-bottom: 10px;">播放量过滤：</label>
             <div style="display: flex; gap: 10px; align-items: center;">
                 <div>
-                    <input type="number" id="minPlayCount" value="0" min="0" style="width: 60px; padding: 5px;">
+                    <input type="number" id="minPlayCount" value="0" min="0" style="width: 80px; padding: 5px;">
                     <span>次</span>
                 </div>
                 <span>至</span>
                 <div>
-                    <input type="number" id="maxPlayCount" value="999999999" min="0" style="width: 60px; padding: 5px;">
+                    <input type="number" id="maxPlayCount" value="999999999" min="0" style="width: 80px; padding: 5px;">
                     <span>次</span>
                 </div>
             </div>
@@ -107,8 +107,10 @@
         filterPanel.style.display = isVisible ? 'none' : 'block';
     });
 
-    // Decode keyword
-    const decodedKeyword = decodeURIComponent('%E6%B2%99%E9%9B%95+%E5%8A%A8%E7%94%BB');
+    // Get keyword from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const encodedKeyword = urlParams.get('keyword') || '';
+    const decodedKeyword = decodeURIComponent(encodedKeyword);
     // Update: keyword is now an editable input
     const keywordInput = document.getElementById('keyword');
     if (keywordInput) {
@@ -148,6 +150,8 @@
 
         // Debug logs for filter parameters
         console.log('=== Bilibili Filter Debug ===');
+        const keyword = document.getElementById('keyword').value.trim();
+        console.log('Keyword filter:', keyword);
         console.log('Classroom filter:', filterClassroom);
         console.log('Live filter:', filterLive);
         console.log('Duration range:', `${minHours}:${minMinutes}:${minSeconds} (${minDuration}s) to ${maxHours}:${maxMinutes}:${maxSeconds} (${maxDuration}s)`);
@@ -159,8 +163,21 @@
         videoCards.forEach(card => {
             let hide = false;
 
+            // Get keyword from input
+            const keyword = document.getElementById('keyword').value.trim();
+
+            // Keyword filter: force video title to contain the keyword
+            const titleElement = card.querySelector('.bili-video-card__info--tit');
+            if (titleElement) {
+                const title = titleElement.textContent;
+                if (keyword && !title.includes(keyword)) {
+                    hide = true;
+                    console.log('Filtered out video with title:', title, 'because it lacks keyword:', keyword);
+                }
+            }
+
             // Filter classroom content
-            if (filterClassroom && card.textContent.includes('课堂')) {
+            if (filterClassroom && (card.textContent.includes('课堂') || card.textContent.includes('课时'))) {
                 hide = true;
             }
 
@@ -200,6 +217,11 @@
     const resetFilter = () => {
         document.getElementById('filterClassroom').checked = true;
         document.getElementById('filterLive').checked = true;
+        // Reset keyword from URL
+        const resetUrlParams = new URLSearchParams(window.location.search);
+        const resetEncodedKeyword = resetUrlParams.get('keyword') || '';
+        const resetDecodedKeyword = decodeURIComponent(resetEncodedKeyword);
+        document.getElementById('keyword').value = resetDecodedKeyword;
         // Update: reset hours, minutes, seconds fields
         document.getElementById('minHours').value = '0';
         document.getElementById('minMinutes').value = '0';
