@@ -107,6 +107,68 @@
         filterPanel.style.display = isVisible ? 'none' : 'block';
     });
 
+    // Load cached filter values
+    const loadCache = () => {
+        const cache = localStorage.getItem('bilibiliSearchFilterCache');
+        if (cache) {
+            try {
+                const filterValues = JSON.parse(cache);
+                // Apply cached values to all filters except keyword
+                if (filterValues.filterClassroom !== undefined) {
+                    const filterClassroom = document.getElementById('filterClassroom');
+                    if (filterClassroom) filterClassroom.checked = filterValues.filterClassroom;
+                }
+                if (filterValues.filterLive !== undefined) {
+                    const filterLive = document.getElementById('filterLive');
+                    if (filterLive) filterLive.checked = filterValues.filterLive;
+                }
+                // Duration filters
+                const minHours = document.getElementById('minHours');
+                const minMinutes = document.getElementById('minMinutes');
+                const minSeconds = document.getElementById('minSeconds');
+                const maxHours = document.getElementById('maxHours');
+                const maxMinutes = document.getElementById('maxMinutes');
+                const maxSeconds = document.getElementById('maxSeconds');
+                if (minHours && filterValues.minHours) minHours.value = filterValues.minHours;
+                if (minMinutes && filterValues.minMinutes) minMinutes.value = filterValues.minMinutes;
+                if (minSeconds && filterValues.minSeconds) minSeconds.value = filterValues.minSeconds;
+                if (maxHours && filterValues.maxHours) maxHours.value = filterValues.maxHours;
+                if (maxMinutes && filterValues.maxMinutes) maxMinutes.value = filterValues.maxMinutes;
+                if (maxSeconds && filterValues.maxSeconds) maxSeconds.value = filterValues.maxSeconds;
+                // Play count filters
+                const minPlayCount = document.getElementById('minPlayCount');
+                const maxPlayCount = document.getElementById('maxPlayCount');
+                if (minPlayCount && filterValues.minPlayCount) minPlayCount.value = filterValues.minPlayCount;
+                if (maxPlayCount && filterValues.maxPlayCount) maxPlayCount.value = filterValues.maxPlayCount;
+
+                console.log('Loaded cached filter values:', filterValues);
+            } catch (error) {
+                console.error('Failed to parse cache:', error);
+            }
+        }
+    };
+
+    // Save filter values to cache (excluding keyword)
+    const saveCache = () => {
+        const filterValues = {
+            filterClassroom: document.getElementById('filterClassroom')?.checked,
+            filterLive: document.getElementById('filterLive')?.checked,
+            // Duration filters
+            minHours: document.getElementById('minHours')?.value,
+            minMinutes: document.getElementById('minMinutes')?.value,
+            minSeconds: document.getElementById('minSeconds')?.value,
+            maxHours: document.getElementById('maxHours')?.value,
+            maxMinutes: document.getElementById('maxMinutes')?.value,
+            maxSeconds: document.getElementById('maxSeconds')?.value,
+            // Play count filters
+            minPlayCount: document.getElementById('minPlayCount')?.value,
+            maxPlayCount: document.getElementById('maxPlayCount')?.value
+            // Keyword is not cached
+        };
+        localStorage.setItem('bilibiliSearchFilterCache', JSON.stringify(filterValues));
+        console.log('Saved filter values to cache:', filterValues);
+    };
+
     // Get keyword from URL
     const urlParams = new URLSearchParams(window.location.search);
     const encodedKeyword = urlParams.get('keyword') || '';
@@ -117,6 +179,9 @@
         keywordInput.value = decodedKeyword;
         console.log('Initial keyword set:', decodedKeyword);
     }
+
+    // Load cache after UI is initialized
+    loadCache();
 
     // Parse play count to number (handles formats like "1.8万" which means 18000)
     const parsePlayCount = (countText) => {
@@ -211,7 +276,10 @@
             // Apply display
             card.closest('.col_3, .video-list > div')?.style.setProperty('display', hide ? 'none' : '');
         });
-    };
+
+    // Save current filter values to cache
+    saveCache();
+};
 
     // Reset filter
     const resetFilter = () => {
@@ -240,7 +308,10 @@
         videoCards.forEach(card => {
             card.closest('.col_3, .video-list > div')?.style.setProperty('display', '');
         });
-    };
+
+    // Save reset filter values to cache
+    saveCache();
+};
 
     // Parse duration to seconds
     const parseDurationToSeconds = (duration) => {
