@@ -1,0 +1,248 @@
+// ==UserScript==
+// @name         Bilibili Search Filter
+// @namespace    http://tampermonkey.net/
+// @version      2025-12-25
+// @description  Filter Bilibili search results with custom options
+// @author       You
+// @match        https://search.bilibili.com/*
+// @icon         https://i0.hdslb.com/bfs/static/jinkela/long/images/favicon.ico
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // Create floating button
+    const floatBtn = document.createElement('div');
+    floatBtn.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 50px;
+        height: 50px;
+        background: url(https://i0.hdslb.com/bfs/static/jinkela/long/images/favicon.ico) center/cover no-repeat;
+        border-radius: 50%;
+        cursor: pointer;
+        z-index: 9999;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    `;
+    document.body.appendChild(floatBtn);
+
+    // Create filter panel
+    const filterPanel = document.createElement('div');
+    filterPanel.style.cssText = `
+        position: fixed;
+        bottom: 80px;
+        right: 20px;
+        width: 320px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        z-index: 9998;
+        padding: 20px;
+        display: none;
+    `;
+
+    // Panel content
+    filterPanel.innerHTML = `
+        <h3 style="margin: 0 0 20px 0; color: #333;">搜索过滤</h3>
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px;">关键词：<input type="text" id="keyword" value="" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;"></label>
+        </div>
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 10px;">过滤选项：</label>
+            <label style="display: flex; align-items: center; margin-bottom: 10px;">
+                <input type="checkbox" id="filterClassroom" checked> 过滤课堂
+            </label>
+            <label style="display: flex; align-items: center;">
+                <input type="checkbox" id="filterLive" checked> 过滤直播
+            </label>
+        </div>
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 10px;">时长过滤：</label>
+            <div style="margin-bottom: 10px;">
+                <span>最小时长:</span>
+                <input type="number" id="minHours" value="0" min="0" style="width: 50px; padding: 5px;">
+                <span>小时</span>
+                <input type="number" id="minMinutes" value="0" min="0" style="width: 50px; padding: 5px;">
+                <span>分钟</span>
+                <input type="number" id="minSeconds" value="0" min="0" style="width: 50px; padding: 5px;">
+                <span>秒</span>
+            </div>
+            <div>
+                <span>最大时长:</span>
+                <input type="number" id="maxHours" value="99" min="0" style="width: 50px; padding: 5px;">
+                <span>小时</span>
+                <input type="number" id="maxMinutes" value="0" min="0" style="width: 50px; padding: 5px;">
+                <span>分钟</span>
+                <input type="number" id="maxSeconds" value="0" min="0" style="width: 50px; padding: 5px;">
+                <span>秒</span>
+            </div>
+        </div>
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 10px;">播放量过滤：</label>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <div>
+                    <input type="number" id="minPlayCount" value="0" min="0" style="width: 60px; padding: 5px;">
+                    <span>次</span>
+                </div>
+                <span>至</span>
+                <div>
+                    <input type="number" id="maxPlayCount" value="999999999" min="0" style="width: 60px; padding: 5px;">
+                    <span>次</span>
+                </div>
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button id="applyFilter" style="flex: 1; padding: 10px; background: #00a1d6; color: white; border: none; border-radius: 4px; cursor: pointer;">应用过滤</button>
+            <button id="resetFilter" style="flex: 1; padding: 10px; background: #ccc; color: #333; border: none; border-radius: 4px; cursor: pointer;">重置</button>
+        </div>
+    `;
+
+    document.body.appendChild(filterPanel);
+
+    // Toggle panel
+    floatBtn.addEventListener('click', () => {
+        const isVisible = filterPanel.style.display === 'block';
+        filterPanel.style.display = isVisible ? 'none' : 'block';
+    });
+
+    // Decode keyword
+    const decodedKeyword = decodeURIComponent('%E6%B2%99%E9%9B%95+%E5%8A%A8%E7%94%BB');
+    // Update: keyword is now an editable input
+    const keywordInput = document.getElementById('keyword');
+    if (keywordInput) {
+        keywordInput.value = decodedKeyword;
+        console.log('Initial keyword set:', decodedKeyword);
+    }
+
+    // Parse play count to number (handles formats like "1.8万" which means 18000)
+    const parsePlayCount = (countText) => {
+        const cleaned = countText.replace(/[\s,]/g, '');
+        if (cleaned.includes('万')) {
+            const num = parseFloat(cleaned.replace('万', ''));
+            return isNaN(num) ? 0 : num * 10000;
+        }
+        const num = parseInt(cleaned);
+        return isNaN(num) ? 0 : num;
+    };
+
+    // Apply filter
+    const applyFilter = () => {
+        const filterClassroom = document.getElementById('filterClassroom').checked;
+        const filterLive = document.getElementById('filterLive').checked;
+
+        // Update: convert hours, minutes, seconds to total seconds
+        const minHours = parseInt(document.getElementById('minHours').value) || 0;
+        const minMinutes = parseInt(document.getElementById('minMinutes').value) || 0;
+        const minSeconds = parseInt(document.getElementById('minSeconds').value) || 0;
+        const maxHours = parseInt(document.getElementById('maxHours').value) || 0;
+        const maxMinutes = parseInt(document.getElementById('maxMinutes').value) || 0;
+        const maxSeconds = parseInt(document.getElementById('maxSeconds').value) || 0;
+
+        const minDuration = minHours * 3600 + minMinutes * 60 + minSeconds;
+        const maxDuration = maxHours * 3600 + maxMinutes * 60 + maxSeconds;
+
+        const minPlayCount = parseInt(document.getElementById('minPlayCount').value) || 0;
+        const maxPlayCount = parseInt(document.getElementById('maxPlayCount').value) || 999999999;
+
+        // Debug logs for filter parameters
+        console.log('=== Bilibili Filter Debug ===');
+        console.log('Classroom filter:', filterClassroom);
+        console.log('Live filter:', filterLive);
+        console.log('Duration range:', `${minHours}:${minMinutes}:${minSeconds} (${minDuration}s) to ${maxHours}:${maxMinutes}:${maxSeconds} (${maxDuration}s)`);
+        console.log('Play count range:', `${minPlayCount} to ${maxPlayCount}`);
+        console.log('Number of video cards found:', document.querySelectorAll('.bili-video-card').length);
+
+        // Process each video card
+        const videoCards = document.querySelectorAll('.bili-video-card');
+        videoCards.forEach(card => {
+            let hide = false;
+
+            // Filter classroom content
+            if (filterClassroom && card.textContent.includes('课堂')) {
+                hide = true;
+            }
+
+            // Filter live stream content
+            if (filterLive && card.textContent.includes('直播')) {
+                hide = true;
+            }
+
+            // Filter duration
+            const durationElement = card.querySelector('.bili-video-card__stats__duration');
+            if (durationElement) {
+                const durationText = durationElement.textContent;
+                const durationSeconds = parseDurationToSeconds(durationText);
+
+                if (durationSeconds < minDuration || durationSeconds > maxDuration) {
+                    hide = true;
+                }
+            }
+
+            // Filter play count
+            const playCountElement = card.querySelector('.bili-video-card__stats--left .bili-video-card__stats--item:nth-child(1) span');
+            if (playCountElement) {
+                const playCountText = playCountElement.textContent;
+                const playCount = parsePlayCount(playCountText);
+
+                if (playCount < minPlayCount || playCount > maxPlayCount) {
+                    hide = true;
+                }
+            }
+
+            // Apply display
+            card.closest('.col_3, .video-list > div')?.style.setProperty('display', hide ? 'none' : '');
+        });
+    };
+
+    // Reset filter
+    const resetFilter = () => {
+        document.getElementById('filterClassroom').checked = true;
+        document.getElementById('filterLive').checked = true;
+        // Update: reset hours, minutes, seconds fields
+        document.getElementById('minHours').value = '0';
+        document.getElementById('minMinutes').value = '0';
+        document.getElementById('minSeconds').value = '0';
+        document.getElementById('maxHours').value = '99';
+        document.getElementById('maxMinutes').value = '0';
+        document.getElementById('maxSeconds').value = '0';
+        document.getElementById('minPlayCount').value = '0';
+        document.getElementById('maxPlayCount').value = '999999999';
+
+        // Debug log
+        console.log('Filter reset to default values');
+
+        // Show all cards
+        const videoCards = document.querySelectorAll('.bili-video-card');
+        videoCards.forEach(card => {
+            card.closest('.col_3, .video-list > div')?.style.setProperty('display', '');
+        });
+    };
+
+    // Parse duration to seconds
+    const parseDurationToSeconds = (duration) => {
+        const parts = duration.split(':').map(Number);
+        let seconds = 0;
+
+        if (parts.length === 3) { // h:m:s
+            seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+        } else if (parts.length === 2) { // m:s
+            seconds = parts[0] * 60 + parts[1];
+        } else if (parts.length === 1) { // s
+            seconds = parts[0];
+        }
+
+        return seconds;
+    };
+
+    // Event listeners
+    document.getElementById('applyFilter').addEventListener('click', applyFilter);
+    document.getElementById('resetFilter').addEventListener('click', resetFilter);
+
+    // Auto filter every second
+    setInterval(applyFilter, 1000);
+
+    // Initial filter
+    // applyFilter();
+})();
