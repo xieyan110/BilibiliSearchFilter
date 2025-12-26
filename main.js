@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili Search Filter
 // @namespace    http://tampermonkey.net/
-// @version      2025-12-25
+// @version      2025-12-26
 // @description  Filter Bilibili search results with custom options
 // @author       You
 // @match        https://search.bilibili.com/*
@@ -93,10 +93,7 @@
                 </div>
             </div>
         </div>
-        <div style="display: flex; gap: 10px;">
-            <button id="applyFilter" style="flex: 1; padding: 10px; background: #00a1d6; color: white; border: none; border-radius: 4px; cursor: pointer;">应用过滤</button>
-            <button id="resetFilter" style="flex: 1; padding: 10px; background: #ccc; color: #333; border: none; border-radius: 4px; cursor: pointer;">重置</button>
-        </div>
+
     `;
 
     document.body.appendChild(filterPanel);
@@ -106,6 +103,7 @@
         const isVisible = filterPanel.style.display === 'block';
         filterPanel.style.display = isVisible ? 'none' : 'block';
     });
+    console.log("欢迎使用哔哩哔哩搜索 强化工具")
 
     // Load cached filter values
     const loadCache = () => {
@@ -141,7 +139,7 @@
                 if (minPlayCount && filterValues.minPlayCount) minPlayCount.value = filterValues.minPlayCount;
                 if (maxPlayCount && filterValues.maxPlayCount) maxPlayCount.value = filterValues.maxPlayCount;
 
-                console.log('Loaded cached filter values:', filterValues);
+                
             } catch (error) {
                 console.error('Failed to parse cache:', error);
             }
@@ -166,7 +164,7 @@
             // Keyword is not cached
         };
         localStorage.setItem('bilibiliSearchFilterCache', JSON.stringify(filterValues));
-        console.log('Saved filter values to cache:', filterValues);
+        
     };
 
     // Get keyword from URL
@@ -177,7 +175,7 @@
     const keywordInput = document.getElementById('keyword');
     if (keywordInput) {
         keywordInput.value = decodedKeyword;
-        console.log('Initial keyword set:', decodedKeyword);
+        
     }
 
     // Load cache after UI is initialized
@@ -214,19 +212,30 @@
         const maxPlayCount = parseInt(document.getElementById('maxPlayCount').value) || 999999999;
 
         // Debug logs for filter parameters
-        console.log('=== Bilibili Filter Debug ===');
+        
         const keyword = document.getElementById('keyword').value.trim();
-        console.log('Keyword filter:', keyword);
-        console.log('Classroom filter:', filterClassroom);
-        console.log('Live filter:', filterLive);
-        console.log('Duration range:', `${minHours}:${minMinutes}:${minSeconds} (${minDuration}s) to ${maxHours}:${maxMinutes}:${maxSeconds} (${maxDuration}s)`);
-        console.log('Play count range:', `${minPlayCount} to ${maxPlayCount}`);
-        console.log('Number of video cards found:', document.querySelectorAll('.bili-video-card').length);
+        
+        
+        
+        
+        
+        
 
         // Process each video card
         const videoCards = document.querySelectorAll('.bili-video-card');
+        const seenLinks = new Set(); // 用于过滤重复视频链接
         videoCards.forEach(card => {
             let hide = false;
+
+            // 过滤重复视频：根据视频链接去重
+            const videoLink = card.querySelector('a')?.href;
+            if (videoLink) {
+                if (seenLinks.has(videoLink)) {
+                    hide = true;
+                } else {
+                    seenLinks.add(videoLink);
+                }
+            }
 
             // Get keyword from input
             const keyword = document.getElementById('keyword').value.trim();
@@ -237,7 +246,7 @@
                 const title = titleElement.textContent;
                 if (keyword && !title.includes(keyword)) {
                     hide = true;
-                    console.log('Filtered out video with title:', title, 'because it lacks keyword:', keyword);
+                    
                 }
             }
 
@@ -278,8 +287,8 @@
         });
 
     // Save current filter values to cache
-    saveCache();
-};
+    saveCache(); 
+    };
 
     // Reset filter
     const resetFilter = () => {
@@ -301,7 +310,7 @@
         document.getElementById('maxPlayCount').value = '999999999';
 
         // Debug log
-        console.log('Filter reset to default values');
+        
 
         // Show all cards
         const videoCards = document.querySelectorAll('.bili-video-card');
@@ -329,9 +338,12 @@
         return seconds;
     };
 
-    // Event listeners
-    document.getElementById('applyFilter').addEventListener('click', applyFilter);
-    document.getElementById('resetFilter').addEventListener('click', resetFilter);
+    // // Event listeners
+    // document.getElementById('applyFilter').addEventListener('click', () => {
+    //     const isVisible = filterPanel.style.display === 'block';
+    //     filterPanel.style.display = isVisible ? 'none' : 'block';
+    // });
+    // document.getElementById('resetFilter').addEventListener('click', resetFilter);
 
     // Auto filter every second
     setInterval(applyFilter, 1000);
